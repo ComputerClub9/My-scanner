@@ -9,22 +9,28 @@
     <style>
         body { font-family: sans-serif; text-align: center; background-color: #f4f4f9; margin: 0; padding: 15px; overflow-x: hidden; }
         .btn { background: #0088cc; color: white; border: none; padding: 18px; font-size: 18px; border-radius: 12px; cursor: pointer; width: 100%; font-weight: bold; margin-bottom: 15px; }
+        .btn-box { background: #28a745; } 
+        .btn-stop { background: #ff4444 !important; }
         #reader { width: 100%; border-radius: 12px; overflow: hidden; background: black; display: none; margin-bottom: 15px; }
         .log { text-align: left; font-size: 11px; background: #fff; padding: 10px; border: 1px solid #ddd; border-radius: 8px; word-break: break-all; max-height: 150px; overflow-y: auto; box-shadow: inset 0 1px 3px rgba(0,0,0,0.1); }
         .status { color: #0088cc; font-weight: bold; margin: 10px 0; min-height: 20px; }
-        .counter { font-size: 14px; color: #666; margin-bottom: 10px; }
+        .box-info { background: #fff; padding: 15px; border-radius: 12px; margin-bottom: 15px; border: 2px dashed #28a745; font-weight: bold; }
     </style>
 </head>
 <body>
     <h2>MarkZnak PRO</h2>
-    <p class="counter">Считывание Full DataMatrix (с хвостом)</p>
     
-    <button id="startBtn" class="btn" onclick="toggleScanner()">ВКЛЮЧИТЬ КАМЕРУ</button>
+    <div id="boxDisplay" class="box-info">Коробка: НЕ НАЧАТА</div>
+    
+    <button id="boxBtn" class="btn btn-box" onclick="toggleBox()">НАЧАТЬ НОВУЮ КОРОБКУ</button>
+    <button id="startBtn" class="btn" onclick="toggleScanner()" style="display:none;">ВКЛЮЧИТЬ КАМЕРУ</button>
     
     <div id="reader"></div>
     
     <div id="status" class="status">Готов к работе</div>
     <div id="log" class="log">Здесь появится расшифровка кода...</div>
+
+    <audio id="beep" src="https://www.soundjay.com/button/beep-07.mp3" preload="auto"></audio>
 
     <script>
         const tg = window.Telegram.WebApp;
@@ -34,8 +40,44 @@
         
         let html5QrCode;
         let isScanning = false;
-        let lastResult = ""; // Защита от дублей
+        let lastResult = "";
+        let currentBox = "";
         let scannedCount = 0;
+
+        function playSound() {
+            const audio = document.getElementById('beep');
+            audio.play().catch(e => console.log("Звук заблокирован"));
+        }
+
+        function toggleBox() {
+            const boxBtn = document.getElementById('boxBtn');
+            const startBtn = document.getElementById('startBtn');
+            const display = document.getElementById('boxDisplay');
+
+            if (!currentBox) {
+                // Начинаем коробку
+                currentBox = "BOX-" + Math.floor(Date.now() / 1000);
+                scannedCount = 0;
+                display.innerText = "ТЕКУЩАЯ: " + currentBox + " (0 шт)";
+                boxBtn.innerText = "ЗАВЕРШИТЬ КОРОБКУ";
+                boxBtn.classList.add('btn-stop');
+                startBtn.style.display = "block";
+                tg.HapticFeedback.notificationOccurred('success');
+            } else {
+                // Завершаем
+                tg.showConfirm(`Завершить коробку ${currentBox}?`, (ok) => {
+                    if (ok) {
+                        if (isScanning) stopCamera();
+                        currentBox = "";
+                        display.innerText = "Коробка: ЗАВЕРШЕНА";
+                        boxBtn.innerText = "НАЧАТЬ НОВУЮ КОРОБКУ";
+                        boxBtn.classList.remove('btn-stop');
+                        startBtn.style.display = "none";
+                        tg.close(); // Закрываем, чтобы человек вернулся в чат за файлом
+                    }
+                });
+            }
+        }
 
         function toggleScanner() {
             const reader = document.getElementById('reader');
@@ -54,20 +96,17 @@
 
         function startCamera() {
             html5QrCode = new Html5Qrcode("reader");
-            const config = { fps: 10, qrbox: { width: 250, height: 250 } };
-
             html5QrCode.start(
                 { facingMode: "environment" }, 
-                config, 
+                { fps: 10, qrbox: 250 }, 
                 (decodedText) => {
-                    // Если код такой же, как и 2 секунды назад — игнорируем
                     if (decodedText === lastResult) return;
-                    
                     lastResult = decodedText;
+                    
+                    playSound(); // Тот самый ПИК
                     processCode(decodedText);
-                    tg.HapticFeedback.notificationOccurred('success');
+                    tg.HapticFeedback.impactOccurred('medium');
 
-                    // Через 2 секунды разрешаем сканировать этот же код снова
                     setTimeout(() => { lastResult = ""; }, 2000);
                 }
             ).catch(err => {
@@ -89,31 +128,29 @@
         async function processCode(code) {
             const logDiv = document.getElementById('log');
             const statusDiv = document.getElementById('status');
+            const display = document.getElementById('boxDisplay');
             
             scannedCount++;
-            // Добавляем запись в начало лога
-            logDiv.innerHTML = `<div><b>#${scannedCount}</b> [${code.length} симв]: ${code}</div>` + logDiv.innerHTML;
+            display.innerText = "ТЕКУЩАЯ: " + currentBox + " (" + scannedCount + " шт)";
+            logDiv.innerHTML = `<div><b>#${scannedCount}</b>: ${code.substring(0,30)}...</div>` + logDiv.innerHTML;
             statusDiv.innerText = "⏳ Отправка...";
 
             const data = {
                 userId: tg.initDataUnsafe?.user?.id || "unknown",
                 userName: tg.initDataUnsafe?.user?.username || "no_name",
                 code: code,
-                sessionId: "test_001"
+                sessionId: currentBox // Передаем ID коробки в таблицу (колонка E)
             };
 
             try {
                 await fetch(WEB_APP_URL, {
                     method: "POST",
                     mode: "no-cors",
-                    cache: "no-cache",
                     body: JSON.stringify(data)
                 });
-                
                 statusDiv.innerText = "✅ Сохранено!";
             } catch (e) {
                 statusDiv.innerText = "❌ Ошибка сети";
-                console.error(e);
             }
         }
     </script>
