@@ -3,63 +3,109 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MarkZnak Scanner</title>
+    <title>MarkZnak PRO Scanner</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://unpkg.com/html5-qrcode"></script>
     <style>
-        body { font-family: sans-serif; text-align: center; background-color: #f4f4f9; padding: 20px; }
-        .btn { background: #0088cc; color: white; border: none; padding: 15px 30px; font-size: 18px; border-radius: 10px; cursor: pointer; width: 100%; margin-top: 20px; }
-        .log { margin-top: 20px; text-align: left; font-size: 12px; background: #eee; padding: 10px; border-radius: 5px; word-break: break-all; max-height: 200px; overflow-y: auto; }
-        .status { color: green; font-weight: bold; margin-top: 10px; }
+        body { font-family: sans-serif; text-align: center; background-color: #f4f4f9; margin: 0; padding: 15px; overflow-x: hidden; }
+        .btn { background: #0088cc; color: white; border: none; padding: 18px; font-size: 18px; border-radius: 12px; cursor: pointer; width: 100%; font-weight: bold; margin-bottom: 15px; }
+        #reader { width: 100%; border-radius: 12px; overflow: hidden; background: black; display: none; margin-bottom: 15px; }
+        .log { text-align: left; font-size: 11px; background: #fff; padding: 10px; border: 1px solid #ddd; border-radius: 8px; word-break: break-all; max-height: 150px; overflow-y: auto; box-shadow: inset 0 1px 3px rgba(0,0,0,0.1); }
+        .status { color: #0088cc; font-weight: bold; margin: 10px 0; min-height: 20px; }
+        .counter { font-size: 14px; color: #666; margin-bottom: 10px; }
     </style>
 </head>
 <body>
-    <h2>MarkZnak Scanner</h2>
-    <p>Нативный сканер с поддержкой криптохвоста</p>
+    <h2>MarkZnak PRO</h2>
+    <p class="counter">Считывание Full DataMatrix (с хвостом)</p>
     
-    <button class="btn" onclick="startScan()">СКАНИРОВАТЬ КОД</button>
+    <button id="startBtn" class="btn" onclick="toggleScanner()">ВКЛЮЧИТЬ КАМЕРУ</button>
     
-    <div id="status" class="status"></div>
-    <div id="log" class="log">Здесь появится результат сканирования...</div>
+    <div id="reader"></div>
+    
+    <div id="status" class="status">Готов к работе</div>
+    <div id="log" class="log">Здесь появится расшифровка кода...</div>
 
     <script>
         const tg = window.Telegram.WebApp;
-        tg.expand(); // Развернуть на весь экран
+        tg.expand();
 
-        // !!! ВСТАВЬ СВОЙ URL НИЖЕ !!!
         const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwJ5s9Ja3Qn56flW-A3YZl91AaLUgl0VcXonVWpkGiykOzQDHGtqH07WhQqV7k5oH-l/exec";
+        
+        let html5QrCode;
+        let isScanning = false;
 
-        function startScan() {
-            tg.showScanQrPopup({ text: "Наведите камеру на DataMatrix" }, (text) => {
-                processCode(text);
-                return true; // Закрыть сканер после считывания
+        function toggleScanner() {
+            const reader = document.getElementById('reader');
+            const btn = document.getElementById('startBtn');
+
+            if (!isScanning) {
+                reader.style.display = 'block';
+                btn.innerText = "ВЫКЛЮЧИТЬ КАМЕРУ";
+                btn.style.background = "#ff4444";
+                startCamera();
+                isScanning = true;
+            } else {
+                stopCamera();
+            }
+        }
+
+        function startCamera() {
+            html5QrCode = new Html5Qrcode("reader");
+            const config = { fps: 20, qrbox: { width: 250, height: 250 } };
+
+            html5QrCode.start(
+                { facingMode: "environment" }, 
+                config, 
+                (decodedText) => {
+                    // Код успешно считан
+                    processCode(decodedText);
+                    tg.HapticFeedback.impactOccurred('medium'); 
+                }
+            ).catch(err => {
+                document.getElementById('status').innerText = "Ошибка камеры: " + err;
             });
+        }
+
+        function stopCamera() {
+            if (html5QrCode) {
+                html5QrCode.stop().then(() => {
+                    document.getElementById('reader').style.display = 'none';
+                    document.getElementById('startBtn').innerText = "ВКЛЮЧИТЬ КАМЕРУ";
+                    document.getElementById('startBtn').style.background = "#0088cc";
+                    isScanning = false;
+                });
+            }
         }
 
         async function processCode(code) {
             const logDiv = document.getElementById('log');
             const statusDiv = document.getElementById('status');
             
-            logDiv.innerText = "Считано: " + code;
-            statusDiv.innerText = "Отправка в таблицу...";
+            logDiv.innerText = "Считано (" + code.length + " симв.): " + code;
+            statusDiv.innerText = "⏳ Отправка данных...";
 
             const data = {
                 userId: tg.initDataUnsafe?.user?.id || "unknown",
+                userName: tg.initDataUnsafe?.user?.username || "no_name",
                 code: code,
                 sessionId: "test_001"
             };
 
             try {
-                // Отправляем данные в Google Sheets
                 await fetch(WEB_APP_URL, {
                     method: "POST",
-                    mode: "no-cors", // Важно для Google Script
+                    mode: "no-cors",
+                    cache: "no-cache",
                     body: JSON.stringify(data)
                 });
                 
-                statusDiv.innerText = "✅ Успешно сохранено!";
-                tg.HapticFeedback.notificationOccurred('success'); // Вибрация
+                statusDiv.innerText = "✅ Сохранено в таблицу!";
+                // Небольшая пауза, чтобы не дублировать один и тот же код мгновенно
+                setTimeout(() => { statusDiv.innerText = "Сканируйте следующий..."; }, 2000);
+
             } catch (e) {
-                statusDiv.innerText = "❌ Ошибка отправки";
+                statusDiv.innerText = "❌ Ошибка сети";
                 console.error(e);
             }
         }
