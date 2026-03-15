@@ -7,7 +7,7 @@
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <style>
-        body { font-family: sans-serif; text-align: center; background-color: #f4f4f9; margin: 0; padding: 15px; overflow-x: hidden; }
+        body { font-family: sans-serif; text-align: center; background-color: #f4f4f9; margin: 0; padding: 15px; overflow-x: hidden; transition: background-color 0.2s; }
         .btn { background: #0088cc; color: white; border: none; padding: 18px; font-size: 18px; border-radius: 12px; cursor: pointer; width: 100%; font-weight: bold; margin-bottom: 12px; }
         .btn-box { background: #28a745; } 
         .btn-stop { background: #f39c12 !important; } 
@@ -17,6 +17,7 @@
         .log { text-align: left; font-size: 11px; background: #fff; padding: 10px; border: 1px solid #ddd; border-radius: 8px; word-break: break-all; max-height: 120px; overflow-y: auto; }
         .status { color: #0088cc; font-weight: bold; margin: 10px 0; min-height: 20px; }
         .box-info { background: #fff; padding: 15px; border-radius: 12px; margin-bottom: 15px; border: 2px dashed #28a745; font-weight: bold; font-size: 18px; }
+        .flash-success { background-color: #d4edda !important; }
     </style>
 </head>
 <body>
@@ -46,12 +47,20 @@
         let currentBox = "";
         let scannedCount = 0;
 
-        // Супер-вибрация: два мощных удара
-        function superVibrate() {
-            tg.HapticFeedback.impactOccurred('heavy');
-            setTimeout(() => {
-                tg.HapticFeedback.impactOccurred('heavy');
-            }, 150);
+        // Продвинутая вибрация + вспышка для старых версий ТГ
+        function doVibrate() {
+            // Вспышка экрана
+            document.body.classList.add('flash-success');
+            setTimeout(() => document.body.classList.remove('flash-success'), 200);
+
+            try {
+                if (tg.HapticFeedback && tg.isVersionAtLeast('6.1')) {
+                    tg.HapticFeedback.impactOccurred('heavy');
+                    setTimeout(() => tg.HapticFeedback.impactOccurred('heavy'), 150);
+                } else if (navigator.vibrate) {
+                    navigator.vibrate([100, 50, 100]); // Браузерная вибрация
+                }
+            } catch (e) { console.log("Вибрация не поддерживается"); }
         }
 
         function toggleBox() {
@@ -66,7 +75,7 @@
                 boxBtn.innerText = "ЗАВЕРШИТЬ ТЕКУЩУЮ";
                 boxBtn.classList.add('btn-stop');
                 startBtn.style.display = "block";
-                tg.HapticFeedback.notificationOccurred('success');
+                if (tg.isVersionAtLeast('6.1')) tg.HapticFeedback.notificationOccurred('success');
             } else {
                 tg.showConfirm(`Завершить коробку ${currentBox}?`, (ok) => {
                     if (ok) {
@@ -75,7 +84,6 @@
                         boxBtn.innerText = "НАЧАТЬ СЛЕДУЮЩУЮ";
                         boxBtn.classList.remove('btn-stop');
                         scannedCount = 0;
-                        tg.HapticFeedback.notificationOccurred('warning');
                     }
                 });
             }
@@ -101,10 +109,8 @@
                 (decodedText) => {
                     if (decodedText === lastResult) return;
                     lastResult = decodedText;
-                    
-                    superVibrate(); // Используем усиленную вибрацию
+                    doVibrate(); 
                     processCode(decodedText);
-                    
                     setTimeout(() => { lastResult = ""; }, 3000);
                 }
             );
@@ -123,7 +129,6 @@
 
         async function processCode(code) {
             const logDiv = document.getElementById('log');
-            const statusDiv = document.getElementById('status');
             const display = document.getElementById('boxDisplay');
             scannedCount++;
             display.innerText = "ТЕКУЩАЯ: " + currentBox + " (" + scannedCount + " шт)";
@@ -141,18 +146,15 @@
 
         async function exportData() {
             const statusDiv = document.getElementById('status');
+            const userId = tg.initDataUnsafe?.user?.id || "unknown";
             statusDiv.innerText = "⏳ Файл готовится...";
-            const data = {
-                userId: tg.initDataUnsafe?.user?.id || "unknown",
-                code: "COMMAND_EXPORT",
-                sessionId: "COMMAND"
-            };
             
-            // Важно: для команды экспорта убираем no-cors чтобы увидеть если будет ошибка
+            // Запасной метод через GET для старых версий
+            const exportUrl = `${WEB_APP_URL}?userId=${userId}&command=export`;
+
             try {
-                await fetch(WEB_APP_URL, { method: "POST", mode: "no-cors", body: JSON.stringify(data) });
+                await fetch(exportUrl, { method: "GET", mode: "no-cors" });
                 statusDiv.innerText = "✅ Проверь чат бота!";
-                tg.HapticFeedback.notificationOccurred('success');
             } catch (e) {
                 statusDiv.innerText = "❌ Ошибка связи";
             }
