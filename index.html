@@ -34,6 +34,8 @@
         
         let html5QrCode;
         let isScanning = false;
+        let lastResult = ""; // Защита от дублей
+        let scannedCount = 0;
 
         function toggleScanner() {
             const reader = document.getElementById('reader');
@@ -52,15 +54,21 @@
 
         function startCamera() {
             html5QrCode = new Html5Qrcode("reader");
-            const config = { fps: 20, qrbox: { width: 250, height: 250 } };
+            const config = { fps: 10, qrbox: { width: 250, height: 250 } };
 
             html5QrCode.start(
                 { facingMode: "environment" }, 
                 config, 
                 (decodedText) => {
-                    // Код успешно считан
+                    // Если код такой же, как и 2 секунды назад — игнорируем
+                    if (decodedText === lastResult) return;
+                    
+                    lastResult = decodedText;
                     processCode(decodedText);
-                    tg.HapticFeedback.impactOccurred('medium'); 
+                    tg.HapticFeedback.notificationOccurred('success');
+
+                    // Через 2 секунды разрешаем сканировать этот же код снова
+                    setTimeout(() => { lastResult = ""; }, 2000);
                 }
             ).catch(err => {
                 document.getElementById('status').innerText = "Ошибка камеры: " + err;
@@ -82,8 +90,10 @@
             const logDiv = document.getElementById('log');
             const statusDiv = document.getElementById('status');
             
-            logDiv.innerText = "Считано (" + code.length + " симв.): " + code;
-            statusDiv.innerText = "⏳ Отправка данных...";
+            scannedCount++;
+            // Добавляем запись в начало лога
+            logDiv.innerHTML = `<div><b>#${scannedCount}</b> [${code.length} симв]: ${code}</div>` + logDiv.innerHTML;
+            statusDiv.innerText = "⏳ Отправка...";
 
             const data = {
                 userId: tg.initDataUnsafe?.user?.id || "unknown",
@@ -100,10 +110,7 @@
                     body: JSON.stringify(data)
                 });
                 
-                statusDiv.innerText = "✅ Сохранено в таблицу!";
-                // Небольшая пауза, чтобы не дублировать один и тот же код мгновенно
-                setTimeout(() => { statusDiv.innerText = "Сканируйте следующий..."; }, 2000);
-
+                statusDiv.innerText = "✅ Сохранено!";
             } catch (e) {
                 statusDiv.innerText = "❌ Ошибка сети";
                 console.error(e);
