@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>MarkZnak Scanner</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        body { font-family: sans-serif; text-align: center; background-color: #f4f4f9; padding: 20px; }
+        .btn { background: #0088cc; color: white; border: none; padding: 15px 30px; font-size: 18px; border-radius: 10px; cursor: pointer; width: 100%; margin-top: 20px; }
+        .log { margin-top: 20px; text-align: left; font-size: 12px; background: #eee; padding: 10px; border-radius: 5px; word-break: break-all; max-height: 200px; overflow-y: auto; }
+        .status { color: green; font-weight: bold; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <h2>MarkZnak Scanner</h2>
+    <p>Нативный сканер с поддержкой криптохвоста</p>
+    
+    <button class="btn" onclick="startScan()">СКАНИРОВАТЬ КОД</button>
+    
+    <div id="status" class="status"></div>
+    <div id="log" class="log">Здесь появится результат сканирования...</div>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.expand(); // Развернуть на весь экран
+
+        // !!! ВСТАВЬ СВОЙ URL НИЖЕ !!!
+        const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwJ5s9Ja3Qn56flW-A3YZl91AaLUgl0VcXonVWpkGiykOzQDHGtqH07WhQqV7k5oH-l/exec";
+
+        function startScan() {
+            tg.showScanQrPopup({ text: "Наведите камеру на DataMatrix" }, (text) => {
+                processCode(text);
+                return true; // Закрыть сканер после считывания
+            });
+        }
+
+        async function processCode(code) {
+            const logDiv = document.getElementById('log');
+            const statusDiv = document.getElementById('status');
+            
+            logDiv.innerText = "Считано: " + code;
+            statusDiv.innerText = "Отправка в таблицу...";
+
+            const data = {
+                userId: tg.initDataUnsafe?.user?.id || "unknown",
+                code: code,
+                sessionId: "test_001"
+            };
+
+            try {
+                // Отправляем данные в Google Sheets
+                await fetch(WEB_APP_URL, {
+                    method: "POST",
+                    mode: "no-cors", // Важно для Google Script
+                    body: JSON.stringify(data)
+                });
+                
+                statusDiv.innerText = "✅ Успешно сохранено!";
+                tg.HapticFeedback.notificationOccurred('success'); // Вибрация
+            } catch (e) {
+                statusDiv.innerText = "❌ Ошибка отправки";
+                console.error(e);
+            }
+        }
+    </script>
+</body>
+</html>
