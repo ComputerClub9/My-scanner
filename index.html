@@ -7,7 +7,7 @@
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <style>
-        body { font-family: sans-serif; text-align: center; background-color: #f4f4f9; margin: 0; padding: 15px; overflow-x: hidden; transition: background-color 0.2s; }
+        body { font-family: sans-serif; text-align: center; background-color: #f4f4f9; margin: 0; padding: 15px; overflow-x: hidden; }
         .btn { background: #0088cc; color: white; border: none; padding: 18px; font-size: 18px; border-radius: 12px; cursor: pointer; width: 100%; font-weight: bold; margin-bottom: 12px; }
         .btn-box { background: #28a745; } 
         .btn-stop { background: #f39c12 !important; } 
@@ -39,7 +39,8 @@
         const tg = window.Telegram.WebApp;
         tg.expand();
 
-        const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwp_XD9o_sEPvcM27eVzQFjyVuhVwt61dZQCGgjlWyAuHS_vZBfWJpvScIqZ-7p6zLR/exec";
+        // ТВОЙ НОВЫЙ URL СКРИПТА
+        const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbx-cQQk6JglUiGVsETjaRESDLInxjBvpqNiPzjfomSFJAgNLglrpcjMQ1noi4TZ6oha/exec";
         
         let html5QrCode;
         let isScanning = false;
@@ -47,20 +48,16 @@
         let currentBox = "";
         let scannedCount = 0;
 
-        // Продвинутая вибрация + вспышка для старых версий ТГ
         function doVibrate() {
-            // Вспышка экрана
             document.body.classList.add('flash-success');
             setTimeout(() => document.body.classList.remove('flash-success'), 200);
-
             try {
-                if (tg.HapticFeedback && tg.isVersionAtLeast('6.1')) {
-                    tg.HapticFeedback.impactOccurred('heavy');
-                    setTimeout(() => tg.HapticFeedback.impactOccurred('heavy'), 150);
+                if (tg.HapticFeedback) {
+                    tg.HapticFeedback.impactOccurred('medium');
                 } else if (navigator.vibrate) {
-                    navigator.vibrate([100, 50, 100]); // Браузерная вибрация
+                    navigator.vibrate(100);
                 }
-            } catch (e) { console.log("Вибрация не поддерживается"); }
+            } catch (e) {}
         }
 
         function toggleBox() {
@@ -75,7 +72,6 @@
                 boxBtn.innerText = "ЗАВЕРШИТЬ ТЕКУЩУЮ";
                 boxBtn.classList.add('btn-stop');
                 startBtn.style.display = "block";
-                if (tg.isVersionAtLeast('6.1')) tg.HapticFeedback.notificationOccurred('success');
             } else {
                 tg.showConfirm(`Завершить коробку ${currentBox}?`, (ok) => {
                     if (ok) {
@@ -83,7 +79,8 @@
                         display.innerText = "Коробка: ЗАВЕРШЕНА";
                         boxBtn.innerText = "НАЧАТЬ СЛЕДУЮЩУЮ";
                         boxBtn.classList.remove('btn-stop');
-                        scannedCount = 0;
+                        startBtn.style.display = "none";
+                        stopCamera();
                     }
                 });
             }
@@ -105,19 +102,28 @@
 
         function startCamera() {
             html5QrCode = new Html5Qrcode("reader");
-            html5QrCode.start({ facingMode: "environment" }, { fps: 15, qrbox: 250 }, 
+            const config = { 
+                fps: 20, 
+                qrbox: { width: 250, height: 250 },
+                // Оптимизация под DataMatrix (Честный Знак)
+                formatsToSupport: [ Html5QrcodeSupportedFormats.DATA_MATRIX, Html5QrcodeSupportedFormats.QR_CODE ]
+            };
+            
+            html5QrCode.start({ facingMode: "environment" }, config, 
                 (decodedText) => {
                     if (decodedText === lastResult) return;
                     lastResult = decodedText;
                     doVibrate(); 
                     processCode(decodedText);
-                    setTimeout(() => { lastResult = ""; }, 3000);
+                    setTimeout(() => { lastResult = ""; }, 2000);
                 }
-            );
+            ).catch(err => {
+                document.getElementById('status').innerText = "Ошибка камеры: " + err;
+            });
         }
 
         function stopCamera() {
-            if (html5QrCode) {
+            if (html5QrCode && html5QrCode.isScanning) {
                 html5QrCode.stop().then(() => {
                     document.getElementById('reader').style.display = 'none';
                     document.getElementById('startBtn').innerText = "ВКЛЮЧИТЬ КАМЕРУ";
@@ -132,29 +138,38 @@
             const display = document.getElementById('boxDisplay');
             scannedCount++;
             display.innerText = "ТЕКУЩАЯ: " + currentBox + " (" + scannedCount + " шт)";
-            logDiv.innerHTML = `<div><b>#${scannedCount}</b>: ${code.substring(0,30)}...</div>` + logDiv.innerHTML;
+            
+            // Визуальный лог
+            const shortCode = code.length > 20 ? code.substring(0, 20) + "..." : code;
+            logDiv.innerHTML = `<div><b>#${scannedCount}</b>: ${shortCode}</div>` + logDiv.innerHTML;
             
             const data = {
-                userId: tg.initDataUnsafe?.user?.id || "unknown",
+                userId: String(tg.initDataUnsafe?.user?.id || "unknown"),
                 userName: tg.initDataUnsafe?.user?.username || "no_name",
                 code: code,
                 sessionId: currentBox
             };
 
-            fetch(WEB_APP_URL, { method: "POST", mode: "no-cors", body: JSON.stringify(data) });
+            fetch(WEB_APP_URL, { 
+                method: "POST", 
+                mode: "no-cors", 
+                cache: "no-cache",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(data) 
+            });
         }
 
         async function exportData() {
             const statusDiv = document.getElementById('status');
-            const userId = tg.initDataUnsafe?.user?.id || "unknown";
+            const userId = String(tg.initDataUnsafe?.user?.id || "unknown");
             statusDiv.innerText = "⏳ Файл готовится...";
             
-            // Запасной метод через GET для старых версий
             const exportUrl = `${WEB_APP_URL}?userId=${userId}&command=export`;
 
             try {
                 await fetch(exportUrl, { method: "GET", mode: "no-cors" });
                 statusDiv.innerText = "✅ Проверь чат бота!";
+                setTimeout(() => { statusDiv.innerText = "Готов к работе"; }, 5000);
             } catch (e) {
                 statusDiv.innerText = "❌ Ошибка связи";
             }
