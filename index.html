@@ -11,7 +11,8 @@
         .btn { background: #0088cc; color: white; border: none; padding: 18px; font-size: 18px; border-radius: 12px; cursor: pointer; width: 100%; font-weight: bold; margin-bottom: 12px; }
         .btn-box { background: #28a745; } 
         .btn-stop { background: #f39c12 !important; } /* Оранжевый для смены коробки */
-        .btn-exit { background: #34495e !important; font-size: 14px; padding: 10px; } /* Темная для выхода */
+        .btn-export { background: #2ecc71 !important; } /* Зеленая для экспорта */
+        .btn-exit { background: #34495e !important; font-size: 14px; padding: 10px; margin-top: 10px; } /* Темная для выхода */
         #reader { width: 100%; border-radius: 12px; overflow: hidden; background: black; display: none; margin-bottom: 15px; }
         .log { text-align: left; font-size: 11px; background: #fff; padding: 10px; border: 1px solid #ddd; border-radius: 8px; word-break: break-all; max-height: 120px; overflow-y: auto; }
         .status { color: #0088cc; font-weight: bold; margin: 10px 0; min-height: 20px; }
@@ -31,13 +32,15 @@
     <div id="status" class="status">Готов к работе</div>
     <div id="log" class="log">Здесь появится расшифровка кода...</div>
     
+    <button class="btn btn-export" onclick="exportData()">ОТПРАВИТЬ EXCEL В ЧАТ</button>
     <button class="btn btn-exit" onclick="tg.close()">ВЫЙТИ ИЗ ПРИЛОЖЕНИЯ</button>
 
     <script>
         const tg = window.Telegram.WebApp;
         tg.expand();
 
-        const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwJ5s9Ja3Qn56flW-A3YZl91AaLUgl0VcXonVWpkGiykOzQDHGtqH07WhQqV7k5oH-l/exec";
+        // ТВОЙ НОВЫЙ URL
+        const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzMP9donSgTjLslCyeGw5Jd72_vW6Z7yfQjntCN5EbsNC3msR3ySQuTj4o-OZD3HJRd/exec";
         
         let html5QrCode;
         let isScanning = false;
@@ -51,7 +54,6 @@
             const display = document.getElementById('boxDisplay');
 
             if (!currentBox) {
-                // Начинаем новую коробку
                 currentBox = "BOX-" + Math.floor(Date.now() / 1000);
                 scannedCount = 0;
                 display.innerText = "ТЕКУЩАЯ: " + currentBox + " (0 шт)";
@@ -60,14 +62,12 @@
                 startBtn.style.display = "block";
                 tg.HapticFeedback.notificationOccurred('success');
             } else {
-                // Завершаем текущую и сбрасываем для новой
                 tg.showConfirm(`Завершить коробку ${currentBox} и начать новую?`, (ok) => {
                     if (ok) {
                         currentBox = "";
                         display.innerText = "Коробка: ГОТОВА К НОВОЙ";
                         boxBtn.innerText = "НАЧАТЬ СЛЕДУЮЩУЮ";
                         boxBtn.classList.remove('btn-stop');
-                        // Камеру не выключаем, если она была включена, просто сбрасываем контекст
                         scannedCount = 0;
                         tg.HapticFeedback.notificationOccurred('warning');
                     }
@@ -78,7 +78,6 @@
         function toggleScanner() {
             const reader = document.getElementById('reader');
             const btn = document.getElementById('startBtn');
-
             if (!isScanning) {
                 reader.style.display = 'block';
                 btn.innerText = "ВЫКЛЮЧИТЬ КАМЕРУ";
@@ -98,12 +97,8 @@
                 (decodedText) => {
                     if (decodedText === lastResult) return;
                     lastResult = decodedText;
-                    
-                    // Мощная вибрация вместо звука
                     tg.HapticFeedback.impactOccurred('heavy'); 
-                    
                     processCode(decodedText);
-
                     setTimeout(() => { lastResult = ""; }, 2500);
                 }
             ).catch(err => {
@@ -149,6 +144,29 @@
             } catch (e) {
                 statusDiv.innerText = "❌ Ошибка!";
                 tg.HapticFeedback.notificationOccurred('error');
+            }
+        }
+
+        async function exportData() {
+            const statusDiv = document.getElementById('status');
+            statusDiv.innerText = "⏳ Файл готовится...";
+            
+            const data = {
+                userId: tg.initDataUnsafe?.user?.id || "unknown",
+                code: "COMMAND_EXPORT",
+                sessionId: "COMMAND"
+            };
+
+            try {
+                await fetch(WEB_APP_URL, {
+                    method: "POST",
+                    mode: "no-cors",
+                    body: JSON.stringify(data)
+                });
+                statusDiv.innerText = "✅ Файл отправлен в бот!";
+                tg.HapticFeedback.notificationOccurred('success');
+            } catch (e) {
+                statusDiv.innerText = "❌ Ошибка экспорта";
             }
         }
     </script>
