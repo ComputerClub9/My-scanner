@@ -8,112 +8,133 @@
     <script src="https://unpkg.com/html5-qrcode"></script>
     <style>
         :root {
-            --tg-theme-button-color: #0088cc;
-            --success-color: #28a745;
-            --warning-color: #f39c12;
-            --error-color: #d9534f;
+            --bg-color: #0f0f12;
+            --card-bg: #1c1c21;
+            --primary: #0088cc;
+            --accent: #2ecc71;
+            --danger: #e74c3c;
+            --text-main: #ffffff;
+            --text-dim: #a0a0a0;
         }
         body { 
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
-            text-align: center; 
-            background-color: var(--tg-theme-secondary-bg-color, #f4f4f9); 
-            color: var(--tg-theme-text-color, #222);
-            margin: 0; padding: 15px; overflow-x: hidden;
+            font-family: 'Segoe UI', Roboto, sans-serif; 
+            background-color: var(--bg-color); 
+            color: var(--text-main); 
+            margin: 0; padding: 20px; 
+            display: flex; flex-direction: column; align-items: center;
         }
-        .container { max-width: 450px; margin: 0 auto; }
-        .box-info { 
-            background: var(--tg-theme-bg-color, #fff); 
-            padding: 20px; border-radius: 16px; 
-            margin-bottom: 15px; border: 1px solid rgba(0,0,0,0.1);
-            box-shadow: 0 4px 10px rgba(0,0,0,0.05);
-        }
-        .box-id { font-size: 22px; font-weight: bold; color: var(--success-color); }
-        .btn { 
-            display: block; width: 100%; padding: 18px; 
-            font-size: 16px; font-weight: bold; border-radius: 14px; 
-            border: none; cursor: pointer; margin-bottom: 12px;
-            transition: transform 0.1s;
-        }
-        .btn:active { transform: scale(0.98); }
-        .btn-box { background: var(--success-color); color: white; }
-        .btn-stop { background: var(--warning-color) !important; color: white; }
-        .btn-export { background: #6f42c1; color: white; }
-        .btn-exit { background: #34495e; color: white; font-size: 14px; padding: 12px; }
+        .container { width: 100%; max-width: 400px; }
         
-        #reader { width: 100%; border-radius: 16px; overflow: hidden; background: black; display: none; margin-bottom: 15px; border: 3px solid #0088cc; }
-        
-        .log { 
-            text-align: left; font-size: 13px; background: #fff; 
-            padding: 12px; border-radius: 12px; border: 1px solid #ddd;
-            max-height: 140px; overflow-y: auto; margin-top: 10px;
+        h2 { font-weight: 200; letter-spacing: 2px; text-align: center; margin-bottom: 25px; }
+        h2 b { color: var(--primary); font-weight: 800; }
+
+        .status-card {
+            background: var(--card-bg);
+            border-radius: 24px;
+            padding: 25px;
+            text-align: center;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.6);
+            margin-bottom: 25px;
+            border: 1px solid rgba(255,255,255,0.05);
+            transition: all 0.3s ease;
         }
-        .status { font-weight: bold; margin: 10px 0; color: #0088cc; height: 20px; }
-        .flash-success { background-color: #d4edda !important; }
+        .pulse-active { animation: pulse-green 2s infinite; border-color: var(--accent); }
+        @keyframes pulse-green {
+            0% { box-shadow: 0 0 0 0 rgba(46, 204, 113, 0.4); }
+            70% { box-shadow: 0 0 0 15px rgba(46, 204, 113, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(46, 204, 113, 0); }
+        }
+
+        .box-label { font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 2px; }
+        .box-name { font-size: 26px; font-weight: 800; margin: 10px 0; color: var(--primary); }
+        .box-stats { font-size: 14px; color: var(--text-dim); }
+
+        .btn {
+            width: 100%; padding: 18px; border-radius: 18px; border: none;
+            font-size: 16px; font-weight: 700; cursor: pointer;
+            margin-bottom: 15px; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex; align-items: center; justify-content: center; gap: 10px;
+        }
+        .btn:active { transform: scale(0.96); opacity: 0.9; }
+        
+        .btn-box { background: var(--primary); color: white; }
+        .btn-stop { background: var(--danger); color: white; }
+        .btn-export { background: #6c5ce7; color: white; }
+        .btn-exit { background: transparent; color: var(--text-dim); border: 1px solid #333; margin-top: 10px; }
+
+        #reader { 
+            width: 100%; border-radius: 24px; overflow: hidden; 
+            display: none; margin-bottom: 20px; border: 2px solid var(--primary);
+            background: #000;
+        }
+
+        .log-container {
+            background: #000; border-radius: 18px; padding: 15px;
+            height: 130px; overflow-y: auto; font-family: 'Courier New', monospace;
+            font-size: 12px; border: 1px solid #222;
+        }
+        .log-row { margin-bottom: 6px; border-bottom: 1px solid #111; padding-bottom: 4px; color: #00ff41; display: flex; justify-content: space-between; }
+        .status-text { margin: 15px 0; font-size: 14px; font-weight: bold; min-height: 20px; color: var(--primary); }
     </style>
 </head>
 <body>
     <div class="container">
-        <h2>MarkZnak PRO</h2>
-        <div class="box-info">
-            <div style="font-size: 12px; color: #888;">ТЕКУЩАЯ СЕССИЯ</div>
-            <div id="boxDisplay" class="box-id">НЕ НАЧАТА</div>
-            <div id="countDisplay" style="font-size: 14px; margin-top: 5px;">Сканирований: 0</div>
-        </div>
+        <h2>MARKZNAK <b>PRO</b></h2>
         
-        <button id="boxBtn" class="btn btn-box" onclick="toggleBox()">📦 НАЧАТЬ КОРОБКУ</button>
+        <div id="card" class="status-card">
+            <div class="box-label">Активная сессия</div>
+            <div id="boxDisplay" class="box-name">ОЖИДАНИЕ</div>
+            <div id="boxCount" class="box-stats">Сканирований: 0</div>
+        </div>
+
+        <button id="boxBtn" class="btn btn-box" onclick="toggleBox()">📦 ОТКРЫТЬ КОРОБКУ</button>
         
         <div id="reader"></div>
+        <div id="status" class="status-text">Система готова к работе</div>
         
-        <div id="status" class="status">Готов к работе</div>
-        <div id="log" class="log">История сканирования...</div>
-        
-        <button class="btn btn-export" onclick="exportData()">📥 ОТПРАВИТЬ EXCEL В ЧАТ</button>
+        <div class="log-container" id="log">Ожидание первого скана...</div>
+
+        <button class="btn btn-export" onclick="exportData()" style="margin-top: 25px;">📄 ВЫГРУЗИТЬ EXCEL</button>
         <button class="btn btn-exit" onclick="tg.close()">ВЫЙТИ</button>
     </div>
 
     <script>
         const tg = window.Telegram.WebApp;
         tg.expand();
+        tg.headerColor = '#0f0f12';
 
-        // ТВОЙ НОВЫЙ URL
-        const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbyfBwAf4GW8HODYiPZffjiFcUPpb8Q5H3qh-Su9PSX6f6kVZ0LjKRxmhQ39AwMiTZHq/exec";
+        const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbz88Bp7EpURCzFEJL7LuKSqnKNqJ18r8RALAz7MKQyu36qcboSE6YgjRcckxNYDoDS3/exec";
         
         let html5QrCode;
         let currentBox = "";
-        let scannedCount = 0;
-        let sessionCodes = new Set(); // ЗАЩИТА ОТ ДУБЛЕЙ
-
-        function doVibrate(type = 'success') {
-            document.body.classList.add('flash-success');
-            setTimeout(() => document.body.classList.remove('flash-success'), 200);
-            try {
-                if (tg.HapticFeedback) {
-                    if (type === 'error') tg.HapticFeedback.notificationOccurred('error');
-                    else tg.HapticFeedback.impactOccurred('medium');
-                }
-            } catch (e) {}
-        }
+        let count = 0;
+        let sessionCodes = new Set();
 
         function toggleBox() {
             const btn = document.getElementById('boxBtn');
+            const card = document.getElementById('card');
             const display = document.getElementById('boxDisplay');
 
             if (!currentBox) {
-                currentBox = "BOX-" + Math.floor(Date.now() / 1000).toString().slice(-6);
+                currentBox = "BOX-" + Math.floor(Date.now() / 1000).toString().slice(-5);
+                count = 0;
                 sessionCodes.clear();
-                scannedCount = 0;
                 display.innerText = currentBox;
-                document.getElementById('countDisplay').innerText = "Сканирований: 0";
-                btn.innerText = "🛑 ЗАВЕРШИТЬ КОРОБКУ";
-                btn.classList.add('btn-stop');
+                display.style.color = "var(--accent)";
+                document.getElementById('boxCount').innerText = "Сканирований: 0";
+                btn.innerText = "🛑 ЗАКРЫТЬ КОРОБКУ";
+                btn.className = "btn btn-stop";
+                card.classList.add('pulse-active');
                 startCamera();
             } else {
                 tg.showConfirm(`Завершить коробку ${currentBox}?`, (ok) => {
                     if (ok) {
                         currentBox = "";
                         display.innerText = "ЗАВЕРШЕНА";
-                        btn.innerText = "📦 НАЧАТЬ СЛЕДУЮЩУЮ";
-                        btn.classList.remove('btn-stop');
+                        display.style.color = "var(--primary)";
+                        btn.innerText = "📦 ОТКРЫТЬ НОВУЮ";
+                        btn.className = "btn btn-box";
+                        card.classList.remove('pulse-active');
                         stopCamera();
                     }
                 });
@@ -124,72 +145,53 @@
             const reader = document.getElementById('reader');
             reader.style.display = 'block';
             html5QrCode = new Html5Qrcode("reader");
-            const config = { 
-                fps: 20, 
-                qrbox: { width: 250, height: 250 },
-                formatsToSupport: [ Html5QrcodeSupportedFormats.DATA_MATRIX, Html5QrcodeSupportedFormats.QR_CODE ]
-            };
-            
-            html5QrCode.start({ facingMode: "environment" }, config, (decodedText) => {
-                processCode(decodedText);
-            }).catch(err => {
-                document.getElementById('status').innerText = "Ошибка камеры: " + err;
-            });
+            html5QrCode.start({ facingMode: "environment" }, 
+            { fps: 24, qrbox: 250, formatsToSupport: [Html5QrcodeSupportedFormats.DATA_MATRIX] }, 
+            (code) => processCode(code));
         }
 
         function stopCamera() {
-            if (html5QrCode) {
-                html5QrCode.stop().then(() => {
-                    document.getElementById('reader').style.display = 'none';
-                });
-            }
+            if (html5QrCode) html5QrCode.stop().then(() => { document.getElementById('reader').style.display = 'none'; });
         }
 
-        async function processCode(code) {
+        function processCode(code) {
             const statusDiv = document.getElementById('status');
             
-            // ЗАЩИТА ОТ ДУБЛЕЙ
             if (sessionCodes.has(code)) {
-                doVibrate('error');
-                statusDiv.innerText = "⚠️ КОД УЖЕ СКАНЕРОВАН!";
-                statusDiv.style.color = "red";
-                setTimeout(() => { statusDiv.style.color = "#0088cc"; statusDiv.innerText = "Сканируйте..."; }, 2000);
+                tg.HapticFeedback.notificationOccurred('error');
+                statusDiv.innerText = "⚠️ ЭТОТ КОД УЖЕ ЕСТЬ!";
+                statusDiv.style.color = "var(--danger)";
                 return;
             }
 
             sessionCodes.add(code);
-            scannedCount++;
-            document.getElementById('countDisplay').innerText = "Сканирований: " + scannedCount;
-            doVibrate(); 
+            count++;
+            document.getElementById('boxCount').innerText = `Сканирований: ${count}`;
+            tg.HapticFeedback.impactOccurred('medium');
+            statusDiv.innerText = "✅ Принято";
+            statusDiv.style.color = "var(--accent)";
             
-            const logDiv = document.getElementById('log');
-            const shortCode = code.length > 20 ? code.substring(0, 20) + "..." : code;
-            logDiv.innerHTML = `<div><b>#${scannedCount}</b>: ${shortCode}</div>` + logDiv.innerHTML;
-            
-            const data = {
-                userId: String(tg.initDataUnsafe?.user?.id || "unknown"),
-                userName: tg.initDataUnsafe?.user?.username || "no_name",
-                code: code,
-                sessionId: currentBox
-            };
+            const log = document.getElementById('log');
+            const time = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'});
+            log.innerHTML = `<div class="log-row"><span>[${time}]</span> <span>${code.substring(0,18)}...</span></div>` + log.innerHTML;
 
-            fetch(WEB_APP_URL, { 
-                method: "POST", 
-                mode: "no-cors", 
-                body: JSON.stringify(data) 
+            fetch(WEB_APP_URL, {
+                method: "POST",
+                mode: "no-cors",
+                body: JSON.stringify({
+                    userId: String(tg.initDataUnsafe?.user?.id),
+                    userName: tg.initDataUnsafe?.user?.username,
+                    code: code,
+                    sessionId: currentBox
+                })
             });
         }
 
         async function exportData() {
-            const statusDiv = document.getElementById('status');
-            const userId = String(tg.initDataUnsafe?.user?.id || "unknown");
-            statusDiv.innerText = "⏳ Файл готовится...";
-            try {
-                await fetch(`${WEB_APP_URL}?userId=${userId}&command=export`, { method: "GET", mode: "no-cors" });
-                statusDiv.innerText = "✅ Проверь чат бота!";
-            } catch (e) {
-                statusDiv.innerText = "❌ Ошибка связи";
-            }
+            document.getElementById('status').innerText = "⌛ Формирую отчет...";
+            await fetch(`${WEB_APP_URL}?userId=${tg.initDataUnsafe?.user?.id}&command=export`, {mode:"no-cors"});
+            tg.showAlert("Готово! Отчет уже в чате бота.");
+            document.getElementById('status').innerText = "✅ Отправлено";
         }
     </script>
 </body>
