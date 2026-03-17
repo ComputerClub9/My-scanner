@@ -3,7 +3,7 @@ tg.expand();
 tg.headerColor = '#0f0f12';
 
 // Твой URL Google App Script
-const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbz4MiOMn4tTe1utZu6MgFxiKJSmodYA53BCG82LIY8_WOja59ah_TlRd0JULQ-PwhKnGg/exec";
+const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbz1FjEjiiJuR8xgJxPSkRDgMCi_WYL-99wzFhdbumcMPuxd_LoD9MPW2C-5wK4P6vbqhA/exec";
 
 let html5QrCode;
 let currentBox = "";
