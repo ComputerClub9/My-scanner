@@ -2,8 +2,8 @@ const tg = window.Telegram.WebApp;
 tg.expand();
 tg.headerColor = '#0f0f12';
 
-// Твой URL Google App Script
-const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbz1FjEjiiJuR8xgJxPSkRDgMCi_WYL-99wzFhdbumcMPuxd_LoD9MPW2C-5wK4P6vbqhA/exec";
+// Твой АКТУАЛЬНЫЙ URL Google App Script (обновлен)
+const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwXMUUjIExDfux0C2IkzJTmcZ7K5aj1R4znn40Z9HzWHWAR2pdupsZnDgFqBvIgOsiGQw/exec";
 
 let html5QrCode;
 let currentBox = "";
@@ -155,6 +155,7 @@ async function exportData() {
     
     try {
         const userId = tg.initDataUnsafe?.user?.id;
+        // Добавляем параметр command=export, чтобы App Script понял, что это экспорт
         await fetch(`${WEB_APP_URL}?userId=${userId}&command=export`);
         tg.showAlert("📊 Отчет готов! Проверьте чат с ботом.");
         statusDiv.innerText = "✅ Отправлено";
